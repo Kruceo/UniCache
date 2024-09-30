@@ -17,7 +17,7 @@ const KB = 1024
 const MB = KB * 1024
 const GB = MB * 1024
 
-const maxMemoryUsage = 100 * MB
+const maxMemoryUsage = 1 * KB
 
 var excludePaths []string = []string{"/auth/validate", "/auth/login"}
 
@@ -39,6 +39,8 @@ func main() {
 
 	var mu sync.Mutex
 	var cache = make(map[string]*memory.Cache)
+
+	go memory.StartCacheCleanerService(cache, maxMemoryUsage, &mu)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		reqKey := r.URL.Path + "?" + r.URL.RawQuery
@@ -166,13 +168,7 @@ func main() {
 		}
 
 		// verify cache length
-		// if memory.VerifyMemUsage(cache) > maxMemoryUsage {
-		// for key, value := range cache {
-		// 	if value.Access < 3 {
-		// 		delete(cache, key)
-		// 	}
-		// }
-		// }
+
 	})
 
 	fmt.Println("Listening 3030")
