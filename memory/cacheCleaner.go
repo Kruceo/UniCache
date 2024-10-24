@@ -2,37 +2,44 @@ package memory
 
 import (
 	"fmt"
+	"log"
+	"strconv"
 	"sync"
 	"time"
+	"unicache/utils"
 )
 
-func StartCacheCleanerService(cacheMap map[string]*Cache, maxMemoryUsage int, mu *sync.Mutex) {
-	ticker := time.NewTicker(60 * time.Second)
+func StartCacheCleanerService(cacheMap map[string]*Cache, mu *sync.Mutex) {
+	cacheCleanerInterval, err := strconv.ParseInt(utils.GetEnvOrDefault("CACHE_CLEANER_INTERVAL", "60"), 10, 32)
 
-	for {
-		select {
-		case <-ticker.C:
-			mu.Lock()
+	if err != nil {
+		log.Printf("Not possible parse cache cleaner interval (%s): %v", utils.GetEnvOrDefault("CACHE_CLEANER_INTERVAL", "60"), err)
+		return
+	}
+	fmt.Printf("Cache cleaner interval to %dS\n", cacheCleanerInterval)
 
-			sum := 0.0
-			count := 0.0
+	ticker := time.NewTicker(time.Duration(cacheCleanerInterval) * time.Second)
 
-			for key, value := range cacheMap {
-				fmt.Println(key, value.Access)
-				sum += float64(value.Access)
-				count++
-			}
-			median := sum / count
+	for range ticker.C {
+		mu.Lock()
 
-			for key, value := range cacheMap {
-				if value.Access < int(median) {
-					fmt.Println("delete", key)
-					delete(cacheMap, key)
-				}
-			}
-			// delete(cacheMap)
+		sum := 0.0
+		count := 0.0
 
-			mu.Unlock()
+		for key, value := range cacheMap {
+			fmt.Println(key, value.Access)
+			sum += float64(value.Access)
+			count++
 		}
+		median := sum / count
+
+		for key, value := range cacheMap {
+			if value.Access < int(median) {
+				fmt.Printf("delete %s, median %00f, access %d\n", key, median, value.Access)
+				delete(cacheMap, key)
+			}
+		}
+
+		mu.Unlock()
 	}
 }

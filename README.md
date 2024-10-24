@@ -6,7 +6,7 @@
 
 UniCache functions as a middle layer between the client and the backend. When the client sends a request, UniCache checks if the response is already cached. If so, it returns the cached response. Otherwise, it forwards the request to the backend, stores the response, and returns it to the client.
 
-```bash
+```cmd
 Client -> UniCache -> Backend
 ```
 
@@ -59,6 +59,14 @@ POINT_ADDRESS=192.168.0.100 POINT_PORT=8080 POINT_PROTOCOL=http ./unicache
 ```
 
 This sets up UniCache to forward requests to the backend running at `192.168.0.100` on port `8080`.
+
+#### **Other Configurations**
+
+```python
+CACHE_TIMEOUT=40    # 40 seconds
+CACHE_CLEANER_INTERVAL=60    # 60 seconds
+EXCLUDED_PATHS=/authentication,/v1/auth    # don't cache these paths
+```
 
 ### Step 3: Running the UniCache
 

@@ -6,41 +6,40 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unicache/memory"
+	"unicache/utils"
 )
 
-const KB = 1024
-const MB = KB * 1024
-const GB = MB * 1024
-
-const maxMemoryUsage = 1 * KB
-
-var excludePaths []string = []string{"/auth/validate", "/auth/login"}
+var excludePaths []string = strings.Split(utils.GetEnvOrDefault("EXCLUDED_PATHS", ""), ",")
 
 func main() {
 
-	cacheTimeout, err := strconv.ParseInt(GetEnvOrDefault("CACHE_TIMEOUT", "30000"), 10, 64)
+	cacheTimeout, err := strconv.ParseInt(utils.GetEnvOrDefault("CACHE_TIMEOUT", "120"), 10, 32)
 
 	if err != nil {
-		log.Printf("Not possible parse cache timeout (%s): %v", GetEnvOrDefault("CACHE_TIMEOUT", "30000"), err)
+		log.Printf("Not possible parse cache timeout (%s): %v", utils.GetEnvOrDefault("CACHE_TIMEOUT", "120"), err)
 		return
 	}
-	fmt.Printf("Cache timeout defined to %d\n", cacheTimeout)
 
-	backendAddress := GetEnvOrDefault("POINT_ADDRESS", "localhost")
+	fmt.Printf("Cache timeout defined to %dS\n", cacheTimeout)
 
-	backendPort := GetEnvOrDefault("POINT_PORT", "80")
+	// convert to millis
+	cacheTimeout *= 1000
 
-	backendProtocol := GetEnvOrDefault("POINT_PROTOCOL", "http")
+	backendAddress := utils.GetEnvOrDefault("POINT_ADDRESS", "localhost")
+
+	backendPort := utils.GetEnvOrDefault("POINT_PORT", "80")
+
+	backendProtocol := utils.GetEnvOrDefault("POINT_PROTOCOL", "http")
 
 	var mu sync.Mutex
 	var cache = make(map[string]*memory.Cache)
 
-	go memory.StartCacheCleanerService(cache, maxMemoryUsage, &mu)
+	go memory.StartCacheCleanerService(cache, &mu)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		reqKey := r.URL.Path + "?" + r.URL.RawQuery
@@ -112,7 +111,7 @@ func main() {
 			}
 		}
 		mu.Unlock()
-		// fmt.Printf("(%s) %s\n", r.Method, reqKey)
+
 		req, err := http.NewRequest(r.Method, fmt.Sprintf("%s://%s:%s%s?%s", backendProtocol, backendAddress, backendPort, r.URL.Path, r.URL.RawQuery), nil)
 		if err != nil {
 			log.Printf("Error while create request %v\n", err)
@@ -140,7 +139,6 @@ func main() {
 		// set response headers from real API
 		for s, v := range resp.Header {
 			value := v[0]
-			// println(s, value)
 			w.Header().Set(s, value)
 		}
 		// --------------------------------
@@ -182,12 +180,4 @@ func arrayContains(slice []string, value string) bool {
 		}
 	}
 	return false
-}
-
-func GetEnvOrDefault(key, defaultValue string) string {
-	value, exists := os.LookupEnv(key)
-	if !exists {
-		return defaultValue
-	}
-	return value
 }
